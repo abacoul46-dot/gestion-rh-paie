@@ -1,6 +1,6 @@
 # Gestion RH & Paie
 
-Logiciel de paie et de gestion du personnel (calculs repris du classeur Excel « Logiciel de gestion RH »), édité par BIREF — Bamako.
+Logiciel de paie et de gestion du personnel (calculs repris du classeur Excel « Logiciel de gestion RH »), édité par ABA GROUP — Bamako.
 
 Application en ligne : https://abacoul46-dot.github.io/gestion-rh-paie/
 
