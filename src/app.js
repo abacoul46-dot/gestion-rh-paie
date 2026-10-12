@@ -207,7 +207,7 @@ function pAccueil(m) {
       return '<a class="tile" href="#' + t[0] + '"><div class="ic">' + ic(t[1]) + '</div><b>' + t[2] + '</b><span>' + t[3] + '</span></a>';
     }).join('') + '</div>' +
     '<div class="panel"><div class="panel-h"><h2>Prochains contrats à échéance</h2></div><div class="tbl-wrap"><table class="tbl"><tbody>' + ech + '</tbody></table></div>' +
-    '<div class="panel-b"><div class="note info">Les données sont conservées dans ce navigateur. Pour garder vos données dans votre compte Google, activez Fichier › Sauvegarde automatique (Google Drive).</div></div></div></div>';
+    '<div class="panel-b"><div class="note info">Les données sont enregistrées en ligne automatiquement, avec une copie sur cet ordinateur pour travailler sans connexion. Ajoutez vos collaborateurs par Fichier › Utilisateurs de l\'entreprise.</div></div></div></div>';
   if (window.innerWidth < 900) $('#accGrid').style.gridTemplateColumns = 'minmax(0,1fr)';
 }
 function kpi(l, v, unit, s, hero) {
