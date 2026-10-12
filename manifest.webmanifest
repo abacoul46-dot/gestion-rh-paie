@@ -1,0 +1,29 @@
+{
+ "name": "Gestion RH & Paie",
+ "short_name": "RH Paie",
+ "description": "Gestion du personnel et de la paie (Mali)",
+ "lang": "fr",
+ "start_url": "./",
+ "scope": "./",
+ "display": "standalone",
+ "background_color": "#c8cfd7",
+ "theme_color": "#2b333c",
+ "icons": [
+  {
+   "src": "icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png"
+  },
+  {
+   "src": "icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png"
+  },
+  {
+   "src": "icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  }
+ ]
+}
