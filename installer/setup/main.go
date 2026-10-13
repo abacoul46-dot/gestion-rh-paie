@@ -88,6 +88,7 @@ Set-ItemProperty -Path $k -Name UninstallString -Value ('"' + %[5]s + '" /desins
 Set-ItemProperty -Path $k -Name NoModify -Value 1 -Type DWord
 Set-ItemProperty -Path $k -Name NoRepair -Value 1 -Type DWord
 Set-ItemProperty -Path $k -Name EstimatedSize -Value 6000 -Type DWord
+try { Start-Process ie4uinit.exe -ArgumentList '-show' -WindowStyle Hidden } catch {}
 `, win.PS(exe), win.PS(ico), win.PS(dir), win.PS(win.Nom), win.PS(des), win.PS(win.CleDesins), win.PS(win.Version), win.PS(win.Editeur))
 	if out, err := win.PowerShell(script); err != nil {
 		win.Message("Le logiciel est installé, mais les raccourcis n'ont pas pu être créés :\n"+strings.TrimSpace(string(out))+
