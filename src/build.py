@@ -6,8 +6,17 @@ lire = lambda n: open(os.path.join(d, n), encoding='utf8').read()
 out = (lire('shell.html').replace('/*ENGINE*/', lire('engine.js')).replace('/*SEED*/', '[]')
        .replace('/*LOGO*/', '').replace('/*APP*/', lire('app.js')))
 head, rest = out.split('</style>', 1)
+import base64, io
+try:
+    from PIL import Image
+    im = Image.open(os.path.join(d, '..', 'rh-icon-512.png')).convert('RGBA').resize((64, 64), Image.LANCZOS)
+    buf = io.BytesIO(); im.save(buf, 'PNG', optimize=True)
+    fav = 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode()
+except Exception:
+    fav = 'rh-icon-192.png'
+# Icône intégrée dans la page : visible aussi dans le logiciel installé (fenêtre et barre des tâches).
 pwa = ('<link rel="manifest" href="manifest.webmanifest">\n<meta name="theme-color" content="#2b333c">\n'
-       '<link rel="icon" href="rh-icon-192.png">\n<link rel="apple-touch-icon" href="rh-icon-192.png">\n')
+       '<link rel="icon" type="image/png" href="' + fav + '">\n<link rel="apple-touch-icon" href="rh-icon-192.png">\n')
 sw = ("<script>if ('serviceWorker' in navigator && location.protocol === 'https:') "
       "{ navigator.serviceWorker.register('sw.js').catch(function () {}); }</script>\n")
 html = ('<!DOCTYPE html>\n<html lang="fr">\n<head>\n<meta charset="utf-8">\n' + pwa + head + '</style>\n</head>\n<body>\n'
