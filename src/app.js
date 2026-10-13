@@ -1136,6 +1136,7 @@ function http(method, path, body, jeton) {
     .then(function (r) {
       return r.text().then(function (t) {
         var j = null; try { j = t ? JSON.parse(t) : null; } catch (x) { j = null; }
+        if (!r.ok && (r.status >= 500 || r.status === 0)) { var e0 = erreur('RESEAU'); e0.reseau = true; e0.status = r.status; throw e0; }
         if (!r.ok) {
           var e = erreur((j && (j.message || j.msg || j.error_description || j.error)) || ('HTTP ' + r.status), j && (j.error_code || (j.code && String(j.code).indexOf('P0') !== 0 ? j.code : '')));
           e.status = r.status; throw e;
@@ -1381,6 +1382,71 @@ function contenu() { var c = {}; Object.keys(S).forEach(function (k) { if (k !==
 function cleContenu() { var c = contenu(); delete c.maj; return JSON.stringify(c); }
 function ecrireCache() { if (CL.org) lsSet('rh_org_' + CL.org.id, { version: CL.version, dirty: CL.dirty, data: contenu() }); }
 
+// ---------- Copie de secours automatique (dossier Google Drive) ----------
+// En plus de l'enregistrement en ligne, le logiciel réécrit un fichier .json
+// choisi par l'utilisateur (dans le dossier « Google Drive » de l'ordinateur)
+// à chaque modification : les données restent disponibles même si le
+// serveur en ligne s'arrête. Le fichier se recharge par Fichier › Importer.
+var DR = { h: null, etat: 'aucun', dernier: null, cle: '', t: null };
+var fsOK = typeof window.showSaveFilePicker === 'function';
+function idb() { return new Promise(function (res, rej) { var r = indexedDB.open('gestion_rh_paie', 1); r.onupgradeneeded = function () { r.result.createObjectStore('kv'); }; r.onsuccess = function () { res(r.result); }; r.onerror = function () { rej(r.error); }; }); }
+function idbSet(k, v) { return idb().then(function (db) { return new Promise(function (res, rej) { var tx = db.transaction('kv', 'readwrite'); if (v === null) tx.objectStore('kv').delete(k); else tx.objectStore('kv').put(v, k); tx.oncomplete = res; tx.onerror = function () { rej(tx.error); }; }); }); }
+function idbGet(k) { return idb().then(function (db) { return new Promise(function (res, rej) { var rq = db.transaction('kv').objectStore('kv').get(k); rq.onsuccess = function () { res(rq.result); }; rq.onerror = function () { rej(rq.error); }; }); }); }
+function cleDrive() { return CL.org ? 'drive_' + CL.org.id : null; }
+function copieDrive(forcer) {
+  if (!DR.h || DR.etat !== 'ok' || !S || !CL.org) return;
+  var cle = cleContenu();
+  if (!forcer && cle === DR.cle) return;
+  clearTimeout(DR.t);
+  DR.t = setTimeout(function () {
+    var c = contenu(); c.copieDe = { entreprise: CL.org.nom, le: new Date().toISOString(), logiciel: 'Gestion RH & Paie' };
+    DR.h.createWritable().then(function (w) { return w.write(JSON.stringify(c, null, 1)).then(function () { return w.close(); }); })
+      .then(function () { DR.cle = cle; DR.dernier = new Date(); majEtatDrive(); })
+      .catch(function () { DR.etat = 'perm'; majEtatDrive(); });
+  }, 1500);
+}
+function majEtatDrive() {
+  var el = $('#driveState'); if (!el) return;
+  if (!CL.org || !fsOK) { el.innerHTML = ''; return; }
+  if (DR.etat === 'ok') el.innerHTML = '<span class="dot"></span>Copie Drive : ' + esc(DR.h.name) + (DR.dernier ? ' · ' + hm(DR.dernier) : '');
+  else if (DR.etat === 'perm') el.innerHTML = '<span class="dot ko"></span><a href="#" id="driveRe">Copie Drive en pause : cliquez pour reprendre</a>';
+  else el.innerHTML = '<span class="dot ko"></span><a href="#" id="driveCfg">Copie Google Drive non activée</a>';
+  var a = $('#driveRe'); if (a) a.onclick = function (ev) { ev.preventDefault(); reprendreDrive(); };
+  var c = $('#driveCfg'); if (c) c.onclick = function (ev) { ev.preventDefault(); configDrive(); };
+}
+function lierDrive(h) {
+  DR.h = h; DR.etat = 'ok'; DR.cle = '';
+  if (cleDrive()) idbSet(cleDrive(), h).catch(function () {});
+  majEtatDrive(); copieDrive(true);
+}
+function reprendreDrive() {
+  if (!DR.h) return configDrive();
+  DR.h.requestPermission({ mode: 'readwrite' }).then(function (p) { if (p === 'granted') { DR.etat = 'ok'; majEtatDrive(); copieDrive(true); } }).catch(function () {});
+}
+function demarrerDrive() {
+  DR.h = null; DR.etat = 'aucun'; DR.cle = ''; majEtatDrive();
+  if (!fsOK || !window.indexedDB || !cleDrive()) return;
+  var org = CL.org;
+  idbGet(cleDrive()).then(function (h) {
+    if (!h || CL.org !== org) return;
+    DR.h = h;
+    return h.queryPermission({ mode: 'readwrite' }).then(function (p) { DR.etat = p === 'granted' ? 'ok' : 'perm'; majEtatDrive(); copieDrive(true); });
+  }).catch(function () {});
+}
+function configDrive() {
+  if (!CL.org) return;
+  if (!fsOK) { alerte('Copie Google Drive', 'Cette fonction nécessite Microsoft Edge ou Google Chrome (ou le logiciel installé).\n\nEn attendant, utilisez Fichier › Exporter une copie (.json) et enregistrez le fichier dans Google Drive.', 'warn'); return; }
+  dialog({ titre: 'Copie de secours dans Google Drive',
+    html: '<div class="note info"><pre>En plus de l\'enregistrement en ligne, le logiciel peut écrire une copie de vos données dans un fichier, à chaque modification.\nPlacé dans le dossier Google Drive de l\'ordinateur, ce fichier est envoyé automatiquement dans votre compte Google : vos données restent disponibles même si le serveur en ligne s\'arrête.\n\n1. Installez « Google Drive pour ordinateur » (drive.google.com/download) et connectez-vous. Un lecteur « Google Drive » apparaît dans l\'Explorateur de fichiers.\n2. Cliquez sur « Choisir le fichier de copie » et enregistrez-le dans Google Drive › Mon Drive (par exemple dans un dossier « Gestion RH »).\n3. C\'est tout : la copie est mise à jour à chaque modification.\n\nPour recharger la copie : Fichier › Importer une sauvegarde (.json).</pre></div>' +
+      (DR.h ? '<p style="margin:0">Fichier actuel : <b>' + esc(DR.h.name) + '</b>' + (DR.dernier ? ' — dernière copie à ' + hm(DR.dernier) : '') + '</p>' : ''),
+    boutons: [{ t: 'Fermer' }].concat(DR.h ? [{ t: 'Arrêter la copie', cls: 'dan', fn: function () { DR.h = null; DR.etat = 'aucun'; if (cleDrive()) idbSet(cleDrive(), null).catch(function () {}); majEtatDrive(); } }] : [])
+      .concat([{ t: 'Choisir le fichier de copie', cls: 'pri', fn: function () {
+        window.showSaveFilePicker({ suggestedName: 'Gestion RH - ' + (CL.org.nom || 'donnees') + '.json', types: [{ description: 'Données Gestion RH', accept: { 'application/json': ['.json'] } }] })
+          .then(function (h) { lierDrive(h); toast('Copie Google Drive activée : ' + h.name); }).catch(function () {});
+      } }]) });
+}
+
+
 function appliquer(data, version, dirty) {
   var ui = (CL.org && lsGet('rh_ui_' + CL.org.id)) || (S && S.ui) || uiDefaut();
   S = data; S.ui = ui; S.ret = S.ret || {}; S.P = S.P || etatVierge('').P; S.emps = S.emps || [];
@@ -1390,6 +1456,7 @@ function appliquer(data, version, dirty) {
   if (!CL.dirty) CL.derniere = CL.derniere || new Date();
   initListes(); appliquerTheme(); ecrireCache();
   authHide(); construireChrome(); route(); majEtatCloud(); demarrerSuivi();
+  if (DR.org !== CL.org) { DR.org = CL.org; demarrerDrive(); } else copieDrive();
   if (CL.dirty) planifierEnvoi(0);
 }
 function ouvrirOrg(o) {
@@ -1455,6 +1522,7 @@ function save() {
     if (CL.dirty) { if (CL.derniereCle !== cle) { S.maj = new Date().toISOString(); CL.derniereCle = cle; } planifierEnvoi(); }
     ecrireCache();
   }
+  copieDrive();
   majEtatCloud();
 }
 function planifierEnvoi(ms) { clearTimeout(CL.tEnvoi); CL.tEnvoi = setTimeout(envoyer, ms === undefined ? 1500 : ms); }
@@ -1470,7 +1538,12 @@ function envoyer() {
       ecrireCache(); majEtatCloud(); if (CL.dirty) planifierEnvoi();
       return true;
     }
-    if (r.conflit) conflit(r, contenu());
+    if (r.conflit) {
+      // Même contenu déjà en ligne (envoi précédent arrivé mais réponse perdue) : rien à arbitrer.
+      var srv = r.contenu ? JSON.parse(JSON.stringify(r.contenu)) : null; if (srv) delete srv.maj;
+      if (srv && JSON.stringify(srv) === cle) { CL.version = r.version; CL.dernierEnvoye = cle; CL.dirty = cleContenu() !== cle; CL.derniere = new Date(); ecrireCache(); majEtatCloud(); if (CL.dirty) planifierEnvoi(); return true; }
+      conflit(r, contenu());
+    }
     return false;
   }, function (e) {
     CL.envoi = false; if (CL.org !== org) return false;
@@ -1532,7 +1605,7 @@ function finSession() {
   var esp = CL.espace; oublierSession(); clearTimeout(CL.tEnvoi);
   (esp && esp.organisations || []).forEach(function (o) { lsSet('rh_org_' + o.id, null); });
   if (esp) lsSet('rh_espace_' + esp.user_id, null);
-  CL.org = null; CL.espace = null; CL.dirty = false; CL.version = 0; CL.derniere = null;
+  CL.org = null; CL.espace = null; CL.dirty = false; CL.version = 0; CL.derniere = null; DR.org = null; DR.h = null; DR.etat = 'aucun'; clearTimeout(DR.t);
   S = etatVierge(''); S.ui = uiDefaut(); location.hash = '';
   if (poste) ecranActivation('Ce poste est désactivé : sa licence est libérée.', 'ok'); else ecranConnexion('Vous êtes déconnecté.', 'ok');
 }
@@ -1700,7 +1773,7 @@ function menus() {
   if (estEditeur()) f.push(['lnk', 'shield', 'Console éditeur (licences)', 'editeur']);
   if (estPoste()) f.push(['act', 'out', 'Désactiver ce poste…', 'deconnexion']);
   else f.push(['act', 'key', 'Changer mon mot de passe…', 'mdp'], ['act', 'out', 'Se déconnecter', 'deconnexion']);
-  if (org) f.push(['hr'], ['act', 'dl', 'Exporter une copie (.json)', 'sauver']);
+  if (org) f.push(['hr'], ['act', 'cloud', 'Copie de secours Google Drive…', 'drive'], ['act', 'dl', 'Exporter une copie (.json)', 'sauver']);
   if (org && !lectureSeule()) f.push(['act', 'arrow', 'Importer une sauvegarde (.json)', 'restaurer']);
   if (org) f.push(['act', 'dl', 'Exporter le personnel (Excel/CSV)', 'csv'], ['hr'], ['lnk', 'gear', 'Paramètres de la structure', 'parametres'], ['act', 'print', 'Imprimer', 'imprimer']);
   var M = [['Fichier', f]];
@@ -1719,6 +1792,7 @@ function outils() {
 }
 function action(a) {
   if (a === 'sync') synchroniser(true);
+  else if (a === 'drive') configDrive();
   else if (a === 'utilisateurs') gererUtilisateurs();
   else if (a === 'historique') voirHistorique();
   else if (a === 'changer') { if (CL.dirty) { envoyer(); } choisirEntreprise(true); }
@@ -1759,9 +1833,9 @@ function majChrome(id) {
   $('#tbTitle').textContent = 'Gestion RH & Paie — ' + S.P.nom + (p ? ' — [' + p.t + ']' : '');
   var R = rows(), actifs = R.filter(function (x) { return x.r.statut === 'Actif'; }).length;
   var sb = $('#statusbar'), st = $('#saveState');
-  $$('#statusbar > span:not(#saveState):not(#autoState)').forEach(function (x) { x.remove(); });
+  $$('#statusbar > span:not(#saveState):not(#autoState):not(#driveState)').forEach(function (x) { x.remove(); });
   var parts = ['Société : <b>' + esc(S.P.nom) + '</b>', 'Période de paie : du ' + fd(S.periode.debut) + ' au ' + fd(S.periode.fin), 'Salariés actifs : ' + actifs + ' / ' + R.length, 'Date : ' + fd(today())];
-  var ref = $('#autoState') || st; parts.forEach(function (h) { var sp = document.createElement('span'); sp.innerHTML = h; sb.insertBefore(sp, ref); });
+  var ref = $('#driveState') || $('#autoState') || st; parts.forEach(function (h) { var sp = document.createElement('span'); sp.innerHTML = h; sb.insertBefore(sp, ref); });
 }
 construireChrome();
 $('#fileRestore').onchange = function () {
@@ -1771,6 +1845,7 @@ $('#fileRestore').onchange = function () {
     try {
       var o = JSON.parse(rd.result);
       if (!o || !Array.isArray(o.emps) || !o.P) throw new Error('format');
+      delete o.copieDe;
       confirmer('Restaurer une sauvegarde', '<p style="margin:0">Remplacer les données actuelles par la sauvegarde « ' + esc(f.name) + ' » (' + o.emps.length + ' salariés) ?</p>', 'Restaurer', function () {
         S = o; S.ui = S.ui || etatInitial().ui; S.ret = S.ret || {}; S.periode = S.periode || etatInitial().periode; save(); route(); toast('Sauvegarde restaurée');
       });

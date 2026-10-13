@@ -19,6 +19,7 @@ Les clés sont créées dans la console éditeur (Fichier › Console éditeur) 
 - Rôles : Administrateur, Gestionnaire de paie, Consultation seule.
 - Les données sont enregistrées en ligne (Supabase) et gardées sur l'ordinateur : l'application continue de fonctionner sans connexion et envoie les modifications au retour du réseau.
 - Une copie par jour est conservée 30 jours (Fichier › Historique des sauvegardes).
+- Copie de secours automatique dans un fichier (dossier Google Drive) : Fichier › Copie de secours Google Drive. Si le serveur en ligne est arrêté, le logiciel continue en mode hors connexion.
 - L'éditeur gère les licences depuis Fichier › Console éditeur.
 
 ## Fichiers
