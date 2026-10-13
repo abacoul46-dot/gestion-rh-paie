@@ -207,7 +207,7 @@ function pAccueil(m) {
       return '<a class="tile" href="#' + t[0] + '"><div class="ic">' + ic(t[1]) + '</div><b>' + t[2] + '</b><span>' + t[3] + '</span></a>';
     }).join('') + '</div>' +
     '<div class="panel"><div class="panel-h"><h2>Prochains contrats à échéance</h2></div><div class="tbl-wrap"><table class="tbl"><tbody>' + ech + '</tbody></table></div>' +
-    '<div class="panel-b"><div class="note info">Les données sont enregistrées en ligne automatiquement, avec une copie sur cet ordinateur pour travailler sans connexion. Ajoutez vos collaborateurs par Fichier › Utilisateurs de l\'entreprise.</div></div></div></div>';
+    '<div class="panel-b"><div class="note info">Les données sont enregistrées en ligne automatiquement, avec une copie sur cet ordinateur pour travailler sans connexion. Pour installer un autre poste ou ajouter un collaborateur : Fichier › Utilisateurs et postes.</div></div></div></div>';
   if (window.innerWidth < 900) $('#accGrid').style.gridTemplateColumns = 'minmax(0,1fr)';
 }
 function kpi(l, v, unit, s, hero) {
@@ -1077,6 +1077,8 @@ function sauvegarder() { telecharger('Sauvegarde RH ' + (S.P.nom || '') + ' ' + 
 var SUPA_URL = 'https://zawxbeofeamvaufybsve.supabase.co';
 var SUPA_KEY = 'sb_publishable_kZa0FHZpiuZK_5_wfjNlbg_4ic9RP7b';
 var EDITEUR = 'ABA GROUP';
+var URL_WEB = 'https://abacoul46-dot.github.io/gestion-rh-paie/';
+var URL_SETUP = 'https://github.com/abacoul46-dot/gestion-rh-paie/releases/latest/download/Setup-GestionRH-Paie.exe';
 var CL = { sess: null, espace: null, org: null, version: 0, dirty: false, envoi: false, horsLigne: false, derniere: null, dernierEnvoye: '', tEnvoi: null, erreur: '', timers: false };
 IC.cloud = '<path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.5a4 4 0 0 1-.5 8.5z"/><path d="M12 11v5M9.5 13.5 12 11l2.5 2.5"/>';
 IC.out = '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 16l-4-4 4-4M6 12h10"/>';
@@ -1114,6 +1116,10 @@ var ERR_FR = {
   DATES_INVALIDES: 'La date de fin doit être après la date de début.',
   TROP_VOLUMINEUX: 'Les données sont trop volumineuses (logo trop lourd ?). Réduisez la taille du logo.',
   SAUVEGARDE_INTROUVABLE: 'Sauvegarde introuvable.',
+  CLE_INVALIDE: 'Clé de licence invalide. Vérifiez la saisie (format RHP-XXXX-XXXX-XXXX-XXXX).',
+  MAX_POSTES: 'Toutes les licences de cette entreprise sont déjà utilisées.',
+  TROP_DE_TENTATIVES: 'Trop de tentatives. Réessayez dans une heure.',
+  anonymous_provider_disabled: 'L\'activation par clé n\'est pas encore ouverte sur le serveur. Contactez ' + EDITEUR + '.',
   ENTREPRISE_INTROUVABLE: 'Entreprise introuvable.'
 };
 function errFr(e) {
@@ -1139,7 +1145,7 @@ function http(method, path, body, jeton) {
     });
 }
 function majSession(j) {
-  var u = j.user ? { id: j.user.id, email: j.user.email } : (CL.sess && CL.sess.user) || null;
+  var u = j.user ? { id: j.user.id, email: j.user.email || '' } : (CL.sess && CL.sess.user) || null;
   CL.sess = { access_token: j.access_token, refresh_token: j.refresh_token, expires_at: j.expires_at || Math.floor(Date.now() / 1000) + (Number(j.expires_in) || 3600), user: u };
   lsSet('rh_session', CL.sess);
 }
@@ -1165,14 +1171,15 @@ function rpc(nom, args) {
     throw e;
   });
 }
-function urlApp() { return location.origin + location.pathname; }
+function urlApp() { return location.protocol === 'https:' ? location.origin + location.pathname : URL_WEB; }
+function estPoste() { return !!(CL.sess && CL.sess.user && !CL.sess.user.email); }
 
 // ---------- Écran de connexion (au-dessus de l'application) ----------
 function authShow(html, bind) {
   var a = $('#auth');
   if (!a) { a = document.createElement('div'); a.id = 'auth'; a.className = 'auth'; document.body.appendChild(a); }
   a.hidden = false;
-  a.innerHTML = '<div class="auth-card"><div class="auth-h"><span class="appico">RH</span><div><b>Gestion RH &amp; Paie</b><small>Logiciel de paie et de gestion du personnel</small></div></div><div class="auth-b">' + html + '</div></div><div class="auth-f">Édité par ' + EDITEUR + ' — Bamako · Version 2.0</div>';
+  a.innerHTML = '<div class="auth-card"><div class="auth-h"><span class="appico">RH</span><div><b>Gestion RH &amp; Paie</b><small>Logiciel de paie et de gestion du personnel</small></div></div><div class="auth-b">' + html + '</div></div><div class="auth-f">Édité par ' + EDITEUR + ' — Bamako · Version 2.1' + (location.protocol === 'https:' ? ' · <a href="' + URL_SETUP + '">Télécharger le logiciel pour Windows</a>' : '') + '</div>';
   $$('.modal-veil').forEach(function (x) { x.remove(); });
   if (bind) bind(a);
   var f = $('input', a); if (f) f.focus();
@@ -1188,8 +1195,9 @@ function ecranConnexion(msg, type) {
   var dernier = (lsGet('rh_dernier_email') || '');
   authShow('<h2>Connexion</h2><form class="grid" style="gap:12px">' + chp('aEmail', 'Adresse e-mail', 'email', ' autocomplete="username" value="' + esc(dernier) + '"') + chp('aMdp', 'Mot de passe', 'password', ' autocomplete="current-password"') +
     '<div class="auth-msg"></div><button class="btn pri big" type="submit" id="aGo">Se connecter</button></form>' +
-    '<div class="auth-links"><a href="#" id="aOubli">Mot de passe oublié ?</a><a href="#" id="aInsc">Créer un compte</a></div>', function (a) {
+    '<div class="auth-links"><a href="#" id="aOubli">Mot de passe oublié ?</a><a href="#" id="aInsc">Créer un compte</a></div><div class="auth-links"><a href="#" id="aCle">Activer avec une clé de licence</a></div>', function (a) {
     if (msg) authMsg(a, msg, type);
+    $('#aCle', a).onclick = function (ev) { ev.preventDefault(); ecranActivation(); };
     if (dernier) setTimeout(function () { $('#aMdp', a).focus(); }, 0);
     $('#aGo', a).onclick = function () {
       var em = $('#aEmail', a).value.trim(), pw = $('#aMdp', a).value;
@@ -1201,6 +1209,40 @@ function ecranConnexion(msg, type) {
     };
     $('#aOubli', a).onclick = function (ev) { ev.preventDefault(); ecranOubli($('#aEmail', a).value.trim()); };
     $('#aInsc', a).onclick = function (ev) { ev.preventDefault(); ecranInscription(); };
+  });
+}
+function formatCle(v) {
+  var x = String(v || '').toUpperCase().replace(/^\s*RHP/, '').replace(/[^A-Z0-9]/g, '').slice(0, 16);
+  return x ? 'RHP-' + x.match(/.{1,4}/g).join('-') : '';
+}
+function ecranActivation(msg, type) {
+  var poste = lsGet('rh_poste') || '';
+  authShow('<h2>Activation du logiciel</h2><p class="auth-p" style="margin:0 0 12px">Saisissez la clé de licence fournie par ' + EDITEUR + '. Chaque ordinateur activé utilise un poste de la licence.</p><form class="grid" style="gap:12px">' +
+    chp('aCle', 'Clé de licence', 'text', ' autocomplete="off" spellcheck="false" placeholder="RHP-XXXX-XXXX-XXXX-XXXX" style="font-family:var(--ff-mono);letter-spacing:.06em;text-transform:uppercase"') +
+    chp('aPoste', 'Nom de ce poste (ex. PC Comptabilité)', 'text', ' maxlength="60" value="' + esc(poste) + '" placeholder="PC Comptabilité"') +
+    '<div class="auth-msg"></div><button class="btn pri big" type="submit" id="aGo">Activer le logiciel</button></form>' +
+    '<div class="auth-links"><a href="#" id="aCompte">Connexion avec un compte e-mail</a></div>', function (a) {
+    if (msg) authMsg(a, msg, type);
+    var ch = $('#aCle', a);
+    ch.addEventListener('input', function () { var fin = ch.selectionStart === ch.value.length; ch.value = formatCle(ch.value); if (fin) ch.selectionStart = ch.selectionEnd = ch.value.length; });
+    $('#aCompte', a).onclick = function (ev) { ev.preventDefault(); ecranConnexion(); };
+    $('#aGo', a).onclick = function () {
+      var cle = formatCle(ch.value), nom = $('#aPoste', a).value.trim() || 'Poste';
+      if (cle.length !== 23) { authMsg(a, 'La clé doit avoir la forme RHP-XXXX-XXXX-XXXX-XXXX.'); return; }
+      authOcc(a, true); authMsg(a, '');
+      var sess = CL.sess && CL.sess.refresh_token ? Promise.resolve() : http('POST', '/auth/v1/signup', { data: {} }).then(majSession);
+      sess.then(function () { return rpc('activer_cle', { p_cle: cle, p_poste: nom }); }).then(function (r) {
+        if (!r || !r.ok) {
+          authOcc(a, false);
+          var e = r && r.erreur;
+          if (e === 'MAX_POSTES') authMsg(a, 'Les ' + r.max + ' poste(s) de la licence « ' + r.nom + ' » sont déjà utilisés.\nDésactivez un ancien poste (Fichier › Utilisateurs et postes, depuis un poste activé) ou contactez ' + EDITEUR + ' pour ajouter des postes.');
+          else if (e === 'LICENCE_EXPIREE') authMsg(a, 'La licence de « ' + r.nom + ' » a expiré. Contactez ' + EDITEUR + ' pour la renouveler.');
+          else authMsg(a, ERR_FR[e] || 'Activation impossible.');
+          return;
+        }
+        lsSet('rh_poste', nom); lsSet('rh_derniere_org', r.id); toast('Logiciel activé pour « ' + r.nom + ' »'); chargerEspace();
+      }, function (e) { authOcc(a, false); authMsg(a, errFr(e)); });
+    };
   });
 }
 function ecranInscription() {
@@ -1288,6 +1330,7 @@ function choisirEntreprise(forcer) {
     if (orgs.length === 1) return ouvrirOrg(orgs[0]);
     var d = orgs.filter(function (o) { return o.id === der; })[0]; if (d) return ouvrirOrg(d);
   }
+  if (!orgs.length && estPoste()) return ecranActivation('Ce poste n\'est rattaché à aucune licence (poste désactivé ?). Saisissez la clé de licence.', 'warn');
   var em = (CL.espace.email || (CL.sess && CL.sess.user && CL.sess.user.email) || '');
   var liste = orgs.map(function (o) {
     var ok = licenceValide(o);
@@ -1310,10 +1353,11 @@ function choisirEntreprise(forcer) {
 function ecranLicence(o) {
   CL.org = null; clearTimeout(CL.tEnvoi);
   authShow('<h2>Licence expirée</h2><div class="note err"><pre>La licence de « ' + esc(o.nom) + ' » ' + (o.actif === false ? 'est suspendue.' : 'a expiré le ' + fd(o.licence_fin) + '.') + '\n\nVos données sont conservées. Pour renouveler la licence annuelle, contactez ' + EDITEUR + '.</pre></div>' +
-    '<div class="auth-links">' + ((CL.espace.organisations || []).length > 1 || estEditeur() ? '<a href="#" id="aChg">Changer d\'entreprise</a>' : '') + '<a href="#" id="aRe">Vérifier à nouveau</a><a href="#" id="aOut">Se déconnecter</a></div>', function (a) {
+    '<div class="auth-links">' + ((CL.espace.organisations || []).length > 1 || estEditeur() ? '<a href="#" id="aChg">Changer d\'entreprise</a>' : '') + '<a href="#" id="aRe">Vérifier à nouveau</a>' + (estPoste() ? '<a href="#" id="aCle2">Saisir une autre clé</a>' : '<a href="#" id="aOut">Se déconnecter</a>') + '</div>', function (a) {
+    if ($('#aCle2', a)) $('#aCle2', a).onclick = function (ev) { ev.preventDefault(); ecranActivation(); };
     if ($('#aChg', a)) $('#aChg', a).onclick = function (ev) { ev.preventDefault(); choisirEntreprise(true); };
     $('#aRe', a).onclick = function (ev) { ev.preventDefault(); lsSet('rh_derniere_org', o.id); chargerEspace(); };
-    $('#aOut', a).onclick = function (ev) { ev.preventDefault(); deconnexion(); };
+    if ($('#aOut', a)) $('#aOut', a).onclick = function (ev) { ev.preventDefault(); deconnexion(); };
   });
 }
 function ecranErreur(msg, o) {
@@ -1479,36 +1523,44 @@ function majEtatCloud() {
   else if (CL.dirty) el.innerHTML = '<span class="dot warn"></span>Modifications en attente d\'envoi';
   else if (CL.horsLigne) el.innerHTML = '<span class="dot warn"></span>Hors connexion';
   else el.innerHTML = '<span class="dot"></span>Enregistré en ligne' + (CL.derniere ? ' · ' + hm(CL.derniere) : '');
-  var em = CL.sess && CL.sess.user ? CL.sess.user.email : '';
+  var em = CL.sess && CL.sess.user ? (CL.sess.user.email || 'Poste : ' + (lsGet('rh_poste') || 'activé')) : '';
   st.innerHTML = esc(em) + (CL.org ? ' (' + esc(ROLES[CL.org.role] || CL.org.role) + ') · ' + (CL.org.essai ? 'Essai' : 'Licence') + ' jusqu\'au ' + fd(CL.org.licence_fin) : '');
 }
+function finSession() {
+  var poste = estPoste(), t = CL.sess && CL.sess.access_token;
+  if (t) http('POST', '/auth/v1/logout', {}, t).then(null, function () {});
+  var esp = CL.espace; oublierSession(); clearTimeout(CL.tEnvoi);
+  (esp && esp.organisations || []).forEach(function (o) { lsSet('rh_org_' + o.id, null); });
+  if (esp) lsSet('rh_espace_' + esp.user_id, null);
+  CL.org = null; CL.espace = null; CL.dirty = false; CL.version = 0; CL.derniere = null;
+  S = etatVierge(''); S.ui = uiDefaut(); location.hash = '';
+  if (poste) ecranActivation('Ce poste est désactivé : sa licence est libérée.', 'ok'); else ecranConnexion('Vous êtes déconnecté.', 'ok');
+}
 function deconnexion() {
-  function fin() {
-    var t = CL.sess && CL.sess.access_token;
-    if (t) http('POST', '/auth/v1/logout', {}, t).then(null, function () {});
-    var esp = CL.espace; oublierSession(); clearTimeout(CL.tEnvoi);
-    (esp && esp.organisations || []).forEach(function (o) { lsSet('rh_org_' + o.id, null); });
-    if (esp) lsSet('rh_espace_' + esp.user_id, null);
-    CL.org = null; CL.espace = null; CL.dirty = false; CL.version = 0; CL.derniere = null;
-    S = etatVierge(''); S.ui = uiDefaut(); location.hash = '';
-    ecranConnexion('Vous êtes déconnecté.', 'ok');
+  var perte = CL.dirty ? '\n\nAttention : des modifications ne sont pas encore envoyées en ligne' + (CL.horsLigne ? ' (pas de connexion Internet)' : '') + ' et seront perdues.' : '';
+  if (estPoste()) {
+    var orgs = (CL.espace && CL.espace.organisations) || [];
+    return confirmer('Désactiver ce poste', '<div class="note warn"><pre>Ce poste ne pourra plus ouvrir le logiciel et sa licence sera libérée pour un autre ordinateur.\nPour le réactiver plus tard, il faudra saisir à nouveau la clé de licence.' + perte + '</pre></div>', 'Désactiver ce poste', function () {
+      Promise.all(orgs.map(function (o) { return rpc('liberer_poste', { o: o.id }); })).then(finSession, function (e) { alerte('Désactiver ce poste', errFr(e), 'err'); });
+    }, 'dan');
   }
-  if (CL.dirty) confirmer('Se déconnecter', '<div class="note warn"><pre>Des modifications ne sont pas encore envoyées en ligne' + (CL.horsLigne ? ' (pas de connexion Internet)' : '') + '.\nSi vous vous déconnectez maintenant, elles seront perdues.</pre></div>', 'Se déconnecter quand même', fin, 'dan');
-  else fin();
+  if (CL.dirty) confirmer('Se déconnecter', '<div class="note warn"><pre>Si vous vous déconnectez maintenant, vos dernières modifications seront perdues.' + perte + '</pre></div>', 'Se déconnecter quand même', finSession, 'dan');
+  else finSession();
 }
 
 // ---------- Utilisateurs de l'entreprise (administrateur) ----------
 function gererUtilisateurs() {
   if (!CL.org || !estAdmin()) return alerte('Utilisateurs', 'Réservé à l\'administrateur de l\'entreprise.', 'warn');
   var org = CL.org;
-  var v = dialog({ titre: 'Utilisateurs — ' + org.nom, html: '<div id="uZone" class="u-zone">Chargement…</div>', boutons: [{ t: 'Fermer', cls: 'pri' }] });
+  var v = dialog({ titre: 'Utilisateurs et postes — ' + org.nom, html: '<div id="uZone" class="u-zone">Chargement…</div>', boutons: [{ t: 'Fermer', cls: 'pri' }] });
   $('.modal', v).classList.add('large');
   function charger() {
     rpc('liste_membres', { o: org.id }).then(function (r) {
       var nb = r.membres.length + r.invitations.length;
-      $('#uZone', v).innerHTML = '<p style="margin:0 0 8px">Licence : <b>' + nb + ' / ' + r.max + '</b> utilisateur(s).</p><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Adresse e-mail</th><th>Rôle</th><th>État</th><th></th></tr></thead><tbody>' +
+      $('#uZone', v).innerHTML = '<div class="u-cle"><div><span>Clé de licence</span><b id="uCle">' + esc(r.cle || '') + '</b></div><button class="btn sm" type="button" id="uCopie">Copier la clé</button><div class="u-nb">Postes et utilisateurs : <b>' + nb + ' / ' + r.max + '</b></div></div>' +
+        '<p class="auth-p" style="margin:0 0 8px">Pour installer le logiciel sur un autre ordinateur : installez-le, puis saisissez cette clé. Pour libérer la licence d\'un ordinateur remplacé, cliquez sur « Retirer ».</p><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Poste ou adresse e-mail</th><th>Rôle</th><th>Type</th><th></th></tr></thead><tbody>' +
         r.membres.map(function (m) {
-          return '<tr style="cursor:default"><td>' + esc(m.email) + (m.moi ? ' <i>(vous)</i>' : '') + '</td><td><select data-role="' + esc(m.email) + '">' + Object.keys(ROLES).map(function (k) { return '<option value="' + k + '"' + (k === m.role ? ' selected' : '') + '>' + ROLES[k] + '</option>'; }).join('') + '</select></td><td>Actif</td><td><button class="btn dan sm" type="button" data-del-u="' + esc(m.user_id) + '" data-em="' + esc(m.email) + '">Retirer</button></td></tr>';
+          return '<tr style="cursor:default"><td>' + esc(m.email) + (m.moi ? ' <i>(' + (m.poste ? 'ce poste' : 'vous') + ')</i>' : '') + '</td><td><select data-role="' + esc(m.user_id) + '">' + Object.keys(ROLES).map(function (k) { return '<option value="' + k + '"' + (k === m.role ? ' selected' : '') + '>' + ROLES[k] + '</option>'; }).join('') + '</select></td><td>' + (m.poste ? 'Poste (clé)' : 'Compte e-mail') + '</td><td><button class="btn dan sm" type="button" data-del-u="' + esc(m.user_id) + '" data-em="' + esc(m.email) + '">Retirer</button></td></tr>';
         }).join('') +
         r.invitations.map(function (i) {
           return '<tr style="cursor:default"><td>' + esc(i.email) + '</td><td>' + esc(ROLES[i.role]) + '</td><td><i>Invité — doit créer son compte</i></td><td><button class="btn dan sm" type="button" data-del-i="' + esc(i.email) + '">Annuler</button></td></tr>';
@@ -1522,7 +1574,8 @@ function gererUtilisateurs() {
           toast(st === 'invite' ? 'Invitation enregistrée : ' + em + ' doit créer son compte' : 'Utilisateur ajouté'); charger();
         }, function (e) { authMsg(v, errFr(e)); });
       };
-      $$('[data-role]', v).forEach(function (s) { s.onchange = function () { rpc('ajouter_membre', { o: org.id, p_email: s.dataset.role, p_role: s.value }).then(function () { toast('Rôle modifié'); charger(); }, function (e) { authMsg(v, errFr(e)); charger(); }); }; });
+      $('#uCopie', v).onclick = function () { var k = $('#uCle', v).textContent; (navigator.clipboard ? navigator.clipboard.writeText(k) : Promise.reject()).then(function () { toast('Clé copiée'); }, function () { window.prompt('Clé de licence', k); }); };
+      $$('[data-role]', v).forEach(function (s) { s.onchange = function () { rpc('changer_role', { o: org.id, p_user: s.dataset.role, p_role: s.value }).then(function () { toast('Rôle modifié'); charger(); }, function (e) { authMsg(v, errFr(e)); charger(); }); }; });
       $$('[data-del-u]', v).forEach(function (b) { b.onclick = function () { if (!window.confirm('Retirer ' + b.dataset.em + ' ?')) return; rpc('retirer_membre', { o: org.id, p_user: b.dataset.delU, p_email: null }).then(function () { toast('Utilisateur retiré'); charger(); }, function (e) { authMsg(v, errFr(e)); }); }; });
       $$('[data-del-i]', v).forEach(function (b) { b.onclick = function () { rpc('retirer_membre', { o: org.id, p_user: null, p_email: b.dataset.delI }).then(function () { charger(); }, function (e) { authMsg(v, errFr(e)); }); }; });
     }, function (e) { $('#uZone', v).innerHTML = '<div class="note err"><pre>' + esc(errFr(e)) + '</pre></div>'; });
@@ -1560,11 +1613,12 @@ function pEditeur(m) {
   function charger() {
     rpc('editeur_organisations').then(function (l) {
       liste = l; var t = today();
-      $('#eZone', m).innerHTML = '<table class="tbl"><thead><tr><th>Entreprise</th><th>Administrateur(s)</th><th class="num">Utilisateurs</th><th class="num">Salariés</th><th>Début</th><th>Fin</th><th>Statut</th><th>Dernière activité</th><th>Notes</th></tr></thead><tbody>' +
+      $('#eZone', m).innerHTML = '<table class="tbl"><thead><tr><th>Entreprise</th><th>Clé de licence</th><th>Postes / administrateurs</th><th class="num">Postes</th><th class="num">Salariés</th><th>Début</th><th>Fin</th><th>Statut</th><th>Dernière activité</th><th>Notes</th></tr></thead><tbody>' +
         (l.length ? l.map(function (o) {
           var j = Math.round((new Date(o.licence_fin) - new Date(t)) / 86400000);
-          return '<tr data-id="' + esc(o.id) + '"><td><b>' + esc(o.nom) + '</b></td><td>' + esc(o.admins || '') + (o.invitations ? '<br><i style="color:var(--muted)">invité : ' + esc(o.invitations) + '</i>' : '') + '</td><td class="num">' + o.nb_membres + ' / ' + o.max_utilisateurs + '</td><td class="num">' + (o.salaries || 0) + '</td><td>' + fd(o.licence_debut) + '</td><td>' + fd(o.licence_fin) + (o.licence_ok && j <= 30 ? ' <b style="color:var(--amber)">(J-' + j + ')</b>' : '') + '</td><td>' + statut(o) + '</td><td>' + (o.maj_le ? fd(o.maj_le.slice(0, 10)) : '—') + '</td><td>' + esc(o.notes || '') + '</td></tr>';
-        }).join('') : '<tr><td colspan="9" style="padding:14px">Aucune licence. Cliquez sur « Nouvelle licence ».</td></tr>') + '</tbody></table>';
+          return '<tr data-id="' + esc(o.id) + '"><td><b>' + esc(o.nom) + '</b></td><td><span class="mono">' + esc(o.cle || '') + '</span> <button class="btn sm" type="button" data-copie="' + esc(o.cle || '') + '" title="Copier la clé">Copier</button></td><td>' + esc([o.postes, o.admins].filter(Boolean).join(', ')) + (o.invitations ? '<br><i style="color:var(--muted)">invité : ' + esc(o.invitations) + '</i>' : '') + '</td><td class="num">' + o.nb_membres + ' / ' + o.max_utilisateurs + '</td><td class="num">' + (o.salaries || 0) + '</td><td>' + fd(o.licence_debut) + '</td><td>' + fd(o.licence_fin) + (o.licence_ok && j <= 30 ? ' <b style="color:var(--amber)">(J-' + j + ')</b>' : '') + '</td><td>' + statut(o) + '</td><td>' + (o.maj_le ? fd(o.maj_le.slice(0, 10)) : '—') + '</td><td>' + esc(o.notes || '') + '</td></tr>';
+        }).join('') : '<tr><td colspan="10" style="padding:14px">Aucune licence. Cliquez sur « Nouvelle licence ».</td></tr>') + '</tbody></table>';
+      $$('[data-copie]', m).forEach(function (b) { b.onclick = function (ev) { ev.stopPropagation(); var k = b.dataset.copie; (navigator.clipboard ? navigator.clipboard.writeText(k) : Promise.reject()).then(function () { toast('Clé copiée : ' + k); }, function () { window.prompt('Clé de licence', k); }); }; });
       $$('tr[data-id]', m).forEach(function (tr) { tr.ondblclick = function () { formLicence(liste.filter(function (o) { return o.id === tr.dataset.id; })[0]); }; });
     }, function (e) { $('#eZone', m).innerHTML = '<div class="note err" style="margin:12px"><pre>' + esc(errFr(e)) + '</pre></div>'; });
   }
@@ -1573,15 +1627,20 @@ function pEditeur(m) {
     var t = today(), nouv = !o, fin0 = o ? o.licence_fin : plusUnAn(t);
     var v = dialog({ titre: nouv ? 'Nouvelle licence' : 'Licence — ' + o.nom, html: '<form class="grid g2" style="gap:10px">' +
       '<div class="field" style="grid-column:1/-1"><label for="lNom">Entreprise cliente</label><input id="lNom" value="' + esc(o ? o.nom : '') + '"></div>' +
-      (nouv ? '<div class="field" style="grid-column:1/-1"><label for="lEm">E-mail de l\'administrateur du client</label><input id="lEm" type="email" placeholder="drh@client.com"><span class="hint">S\'il n\'a pas encore de compte, il le crée avec cette adresse et il est rattaché automatiquement.</span></div>' : '') +
+      (nouv ? '<div class="field" style="grid-column:1/-1"><label for="lEm">E-mail de l\'administrateur du client (facultatif)</label><input id="lEm" type="email" placeholder="laisser vide : activation par clé uniquement"><span class="hint">Une clé de licence est créée automatiquement : le client la saisit à l\'installation, sur chaque poste.</span></div>' : '') +
       '<div class="field"><label for="lDeb">Début de licence</label><input id="lDeb" type="date" value="' + esc(o ? o.licence_debut : t) + '"></div>' +
       '<div class="field"><label for="lFin">Fin de licence</label><input id="lFin" type="date" value="' + esc(fin0) + '"></div>' +
-      '<div class="field"><label for="lMax">Nombre d\'utilisateurs</label><input id="lMax" type="number" min="1" max="100" value="' + (o ? o.max_utilisateurs : 3) + '"></div>' +
+      '<div class="field"><label for="lMax">Nombre de postes / utilisateurs</label><input id="lMax" type="number" min="1" max="100" value="' + (o ? o.max_utilisateurs : 3) + '"></div>' +
       (nouv ? '' : '<div class="field"><label for="lAct">État</label><select id="lAct"><option value="1"' + (o.actif ? ' selected' : '') + '>Active</option><option value="0"' + (o.actif ? '' : ' selected') + '>Suspendue</option></select></div>') +
       '<div class="field" style="grid-column:1/-1"><label for="lNotes">Notes (facture, contact, montant…)</label><input id="lNotes" value="' + esc(o ? o.notes || '' : '') + '"></div>' +
       (nouv ? '' : '<div class="field" style="grid-column:1/-1"><label for="lAdm">Ajouter un administrateur (e-mail)</label><input id="lAdm" type="email" placeholder="facultatif"></div>') +
       '<div class="auth-msg" style="grid-column:1/-1"></div></form>',
-      boutons: [{ t: 'Annuler' }].concat(nouv ? [] : [{ t: 'Renouveler 1 an', fn: function (w) { var f = $('#lFin', w); var base = f.value > t ? f.value : t; f.value = plusUnAn(base); $('#lAct', w).value = '1'; return false; } }])
+      boutons: [{ t: 'Annuler' }].concat(nouv ? [] : [{ t: 'Nouvelle clé…', fn: function (w) {
+          var retirer = window.confirm('Créer une nouvelle clé pour « ' + o.nom + ' » ?\n\nOK : la nouvelle clé remplace l\'ancienne ET les postes déjà activés sont désactivés (à réactiver avec la nouvelle clé).\nAnnuler : ne rien changer.');
+          if (!retirer) return false;
+          rpc('editeur_nouvelle_cle', { o: o.id, p_retirer_postes: true }).then(function (k) { w.remove(); montrerCle(o.nom, k, true); charger(); }, function (e) { authMsg(w, errFr(e)); });
+          return false;
+        } }, { t: 'Renouveler 1 an', fn: function (w) { var f = $('#lFin', w); var base = f.value > t ? f.value : t; f.value = plusUnAn(base); $('#lAct', w).value = '1'; return false; } }])
         .concat([{ t: 'Enregistrer', cls: 'pri', fn: function (w) {
           var nom = $('#lNom', w).value.trim(), deb = $('#lDeb', w).value, fin = $('#lFin', w).value, max = Number($('#lMax', w).value) || 1, notes = $('#lNotes', w).value.trim() || null;
           var p = nouv ? rpc('editeur_creer_organisation', { p_nom: nom, p_email_admin: $('#lEm', w).value.trim(), p_debut: deb, p_fin: fin, p_max: max, p_notes: notes })
@@ -1589,11 +1648,16 @@ function pEditeur(m) {
               var adm = $('#lAdm', w).value.trim(); return adm ? rpc('editeur_ajouter_admin', { o: o.id, p_email: adm }) : null;
             });
           $$('.mf .btn', w).forEach(function (b) { b.disabled = true; });
-          p.then(function (r) { w.remove(); toast(nouv ? (r && r.admin === 'invite' ? 'Licence créée — l\'administrateur doit créer son compte' : 'Licence créée') : 'Licence enregistrée'); charger(); },
+          p.then(function (r) { w.remove(); if (nouv) montrerCle(nom, r.cle, false); else toast('Licence enregistrée'); charger(); },
             function (e) { $$('.mf .btn', w).forEach(function (b) { b.disabled = false; }); authMsg(w, errFr(e)); });
           return false;
         } }]) });
     $('.modal', v).classList.add('large');
+  }
+  function montrerCle(nom, k, nouvelle) {
+    var v = dialog({ titre: (nouvelle ? 'Nouvelle clé — ' : 'Licence créée — ') + nom, html: '<p style="margin:0">Clé de licence à remettre au client :</p><div class="cle-big">' + esc(k) + '</div><p class="auth-p">Le client installe le logiciel (Setup-GestionRH-Paie.exe) puis saisit cette clé sur chaque poste.</p>',
+      boutons: [{ t: 'Copier la clé', fn: function () { (navigator.clipboard ? navigator.clipboard.writeText(k) : Promise.reject()).then(function () { toast('Clé copiée'); }, function () { window.prompt('Clé de licence', k); }); return false; } }, { t: 'Fermer', cls: 'pri' }] });
+    return v;
   }
   $('#eNew', m).onclick = function () { formLicence(null); };
   $('#eRef', m).onclick = charger;
@@ -1621,7 +1685,7 @@ function demarrerCloud() {
     return;
   }
   CL.sess = lsGet('rh_session');
-  if (CL.sess && CL.sess.refresh_token) chargerEspace(); else ecranConnexion();
+  if (CL.sess && CL.sess.refresh_token) chargerEspace(); else ecranActivation();
 }
 
 // ======================================================================
@@ -1631,10 +1695,11 @@ function menus() {
   var org = !!CL.org, adm = org && estAdmin();
   var f = [];
   if (org) f.push(['act', 'cloud', 'Synchroniser maintenant', 'sync']);
-  if (adm) f.push(['act', 'users', 'Utilisateurs de l\'entreprise…', 'utilisateurs'], ['act', 'hist', 'Historique des sauvegardes…', 'historique']);
+  if (adm) f.push(['act', 'users', 'Utilisateurs et postes…', 'utilisateurs'], ['act', 'hist', 'Historique des sauvegardes…', 'historique']);
   if (CL.espace && ((CL.espace.organisations || []).length > 1 || estEditeur())) f.push(['act', 'arrow', 'Changer d\'entreprise…', 'changer']);
   if (estEditeur()) f.push(['lnk', 'shield', 'Console éditeur (licences)', 'editeur']);
-  f.push(['act', 'key', 'Changer mon mot de passe…', 'mdp'], ['act', 'out', 'Se déconnecter', 'deconnexion']);
+  if (estPoste()) f.push(['act', 'out', 'Désactiver ce poste…', 'deconnexion']);
+  else f.push(['act', 'key', 'Changer mon mot de passe…', 'mdp'], ['act', 'out', 'Se déconnecter', 'deconnexion']);
   if (org) f.push(['hr'], ['act', 'dl', 'Exporter une copie (.json)', 'sauver']);
   if (org && !lectureSeule()) f.push(['act', 'arrow', 'Importer une sauvegarde (.json)', 'restaurer']);
   if (org) f.push(['act', 'dl', 'Exporter le personnel (Excel/CSV)', 'csv'], ['hr'], ['lnk', 'gear', 'Paramètres de la structure', 'parametres'], ['act', 'print', 'Imprimer', 'imprimer']);
@@ -1664,7 +1729,7 @@ function action(a) {
   else if (a === 'csv') exporterCSV();
   else if (a === 'periode') { if (location.hash !== '#bulletin') location.hash = '#bulletin'; setTimeout(bulletinsPeriode, 80); }
   else if (a === 'imprimer') { var b = $('#bPrint') || $('#dPrint'); if (b && !b.disabled) b.click(); else alerte('Imprimer', 'Ouvrez un bulletin de paie, une attestation ou un certificat de travail pour l\'imprimer.', 'info'); }
-  else if (a === 'apropos') alerte('À propos', 'Gestion RH & Paie — version 2.0 (en ligne)\nÉdité par ' + EDITEUR + ' — Bamako\nCalculs issus du classeur « Logiciel de gestion RH » (formules d\'origine conservées).' + (CL.org ? '\n\nEntreprise : ' + CL.org.nom + '\n' + (CL.org.essai ? 'Essai' : 'Licence') + ' valable jusqu\'au ' + fd(CL.org.licence_fin) + '\nUtilisateurs autorisés : ' + CL.org.max_utilisateurs : ''), 'info');
+  else if (a === 'apropos') alerte('À propos', 'Gestion RH & Paie — version 2.1\nÉdité par ' + EDITEUR + ' — Bamako\nCalculs issus du classeur « Logiciel de gestion RH » (formules d\'origine conservées).' + (CL.org ? '\n\nEntreprise : ' + CL.org.nom + '\n' + (CL.org.essai ? 'Essai' : 'Licence') + ' valable jusqu\'au ' + fd(CL.org.licence_fin) + '\nUtilisateurs autorisés : ' + CL.org.max_utilisateurs : ''), 'info');
 }
 function construireChrome() {
   $('#menubar').innerHTML = menus().map(function (m, i) {
