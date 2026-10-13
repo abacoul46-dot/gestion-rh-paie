@@ -1078,7 +1078,7 @@ var SUPA_URL = 'https://zawxbeofeamvaufybsve.supabase.co';
 var SUPA_KEY = 'sb_publishable_kZa0FHZpiuZK_5_wfjNlbg_4ic9RP7b';
 var EDITEUR = 'ABA GROUP';
 var URL_WEB = 'https://abacoul46-dot.github.io/gestion-rh-paie/';
-var URL_SETUP = 'https://github.com/abacoul46-dot/gestion-rh-paie/releases/latest/download/Setup-GestionRH-Paie.exe';
+var URL_SETUP = 'https://abacoul46-dot.github.io/gestion-rh-paie/telechargement/Setup-GestionRH-Paie.exe';
 var CL = { sess: null, espace: null, org: null, version: 0, dirty: false, envoi: false, horsLigne: false, derniere: null, dernierEnvoye: '', tEnvoi: null, erreur: '', timers: false };
 IC.cloud = '<path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.5a4 4 0 0 1-.5 8.5z"/><path d="M12 11v5M9.5 13.5 12 11l2.5 2.5"/>';
 IC.out = '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 16l-4-4 4-4M6 12h10"/>';

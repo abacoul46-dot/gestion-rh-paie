@@ -11,5 +11,5 @@ cp rh.ico setup/payload/rh.ico
 $RSRC -manifest app.manifest -ico rh.ico -arch amd64 -o lanceur/rsrc_windows_amd64.syso
 $RSRC -manifest app.manifest -ico rh.ico -arch amd64 -o setup/rsrc_windows_amd64.syso
 GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -H windowsgui" -o setup/payload/GestionRH.exe ./lanceur
-GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -H windowsgui" -o ../dist/Setup-GestionRH-Paie.exe ./setup
-ls -la ../dist/
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -H windowsgui" -o ../telechargement/Setup-GestionRH-Paie.exe ./setup
+ls -la ../telechargement/
